@@ -1,118 +1,78 @@
 var fs = require('fs');
-var plugins = fs.readdirSync(__dirname + "/src/plugins").filter(function(one){
-  return fs.existsSync(__dirname + '/src/plugins/' + one + '/info.json')
-    && fs.existsSync(__dirname + '/src/plugins/' + one + '/description.html');
-}).map(function(one){
-  var base = __dirname + '/src/plugins/' + one + '/';
-  var info = require(base + 'info.json');
-  info.description = fs.readFileSync(base + 'description.html', 'utf8');
-  return info;
-});
 
-// This builds the library itself
 module.exports = function (grunt) {
-
-  // Configuration
   grunt.initConfig({
-    pkg: grunt.file.readJSON('package.json'),
-    
+    jade: {
+      compile: {
+        files: [{
+          cwd: "web", src: "**/*.html.jade", dest: ".", expand: true, ext: ".html"
+        }]
+      }
+    },
+
+    concat: {
+      options: { separator: '\n\n' },
+      basic_and_extras: {
+        files: {
+          'temp/test.html': ['src/test.html', 'src/plugins/**/test.html'],
+          'temp/readme.md': ['src/readme.md', 'src/plugins/**/readme.md']
+        }
+      }
+    },
+
     sass: {
       dist: {
-        options: {
-          sourceMap: false,
-          style: 'compressed'
-        },
+        options: { sourcemap: 'none', style: 'compressed' },
         files: {
           'web/style/style.min.css': 'web/style/style.scss',
           'picnic.min.css': 'src/picnic.scss'
         }
       }
     },
-    
+
+    copy: {
+      main: {
+        files: [
+          { src: 'picnic.min.css', dest: 'releases/picnic.min.css' },
+          { src: 'picnic.min.css', dest: 'releases/plugins.min.css' },
+        ]
+      }
+    },
+
+    usebanner: {
+      taskName: {
+        options: {
+          position: 'top',
+          banner: '/* Version ' + grunt.file.readJSON('package.json').version + ' */',
+          linebreak: true
+        },
+        files: { src: 'picnic.min.css' }
+      }
+    },
+
     watch: {
       scripts: {
-        files: [
-          'package.js', // To bump versions
-          'Gruntfile.js',
-          'src/*.scss',
-          'src/*.md',
-          'src/plugins/*.scss',
-          'src/plugins/*.md',
-          'src/plugins/*/*.scss',
-          'src/plugins/*/*.md',
-          'web/*.jade',
-          'web/**/*.css',
-          'web/**/*.scss',
-          'web/*'
-        ],
+        files: [ 'package.js', 'Gruntfile.js', 'src/**/*.*', 'web/**/*.*' ],
         tasks: ['default'],
-        options: { spawn: false, },
+        options: { spawn: false },
       }
     },
-    
-    jade: {
-      compile: {
-        options: {
-          client: false,
-          data: {
-            plugins: plugins
-          }
-        },
-        files: [ {
-          cwd: "web",
-          src: "**/*.html.jade",
-          dest: ".",
-          expand: true,
-          ext: ".html"
-        } ]
+
+    bytesize: {
+      all: {
+        src: [
+          'picnic.min.css'
+        ]
       }
-    },
-    
-    mocha_phantomjs: {
-      all: './tests.html'
     }
   });
 
-  // Dynamically add plugins to the concat
-  // Order of include is irrelevant http://stackoverflow.com/q/7609276
-  grunt.registerTask("parse", "Join and concatenate", function(){
-    
-    // get the current concat config
-    var concat = {
-      test: { src: [], dest: 'test/tests.html' },
-      docs: { src: ['src/readme.md'], dest: 'documentation.md' },
-      preview: { src: [], dest: 'preview.html' }
-    };
-    
-    fs.readdirSync(__dirname + "/src/plugins").forEach(function(name, i){
-      var test = 'src/plugins/' + name + '/test.html';
-      var doc = 'src/plugins/' + name + '/readme.md';
-      var preview = 'src/plugins/' + name + '/description.html';
-      
-      
-      concat.test.src.push(test);
-      concat.docs.src.push(doc);
-      concat.preview.src.push(preview);
-    });
-    
-    console.log(concat.preview);
-    
-    // save the new concat configuration
-    grunt.config.set('concat', concat);
-  });
-
-  // Watch
   grunt.loadNpmTasks('grunt-contrib-watch');
-  
-  // Jade
-  grunt.loadNpmTasks('grunt-contrib-jade');
-  
-  // SASS
-  grunt.loadNpmTasks('grunt-contrib-sass');
-  
-  // SASS
   grunt.loadNpmTasks('grunt-contrib-concat');
-  
-  // 4. Where we tell Grunt what to do when we type "grunt" into the terminal
-  grunt.registerTask('default', ['parse', 'concat', 'sass', 'jade']);
+  grunt.loadNpmTasks('grunt-contrib-sass');
+  grunt.loadNpmTasks('grunt-banner');
+  grunt.loadNpmTasks('grunt-contrib-copy');
+  grunt.loadNpmTasks('grunt-contrib-jade');
+  grunt.loadNpmTasks('grunt-bytesize');
+  grunt.registerTask('default', ['concat', 'sass', 'usebanner', 'copy', 'jade', 'bytesize']);
 };
